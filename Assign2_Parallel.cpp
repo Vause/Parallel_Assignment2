@@ -1,7 +1,7 @@
 //CSCI415; Saeed Salem, 9/6/2017
-//To compile: g++ -O3 -w assign2Graph.cpp -lpthread -o assign2Graph
-//To run: ./assign2Graph filename
-//./assign2Graph networkDatasets/toyGraph1.txt
+//To compile: g++ -O3 -w assign2Graph.cpp -lpthread -o assign2Graph 
+//To run: ./assign2Graph filename t
+//./assign2Graph networkDatasets/toyGraph1.txt 4
 
 #include <stdio.h>      /* printf, fgets */
 #include <stdlib.h>  /* atoi */
@@ -10,11 +10,18 @@
 #include <vector>
 #include <iomanip>
 #include <string>
+#include <thread>         // std::thread
+#include <mutex>          // std::mutex
 
 using namespace std;
 
 typedef std::vector< std::vector<int> > AdjacencyMatrix;
 AdjacencyMatrix adjMatrix;
+mutex mtx;
+int n = 0;
+int thread_count = 0;
+double globalCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC;
+
 
 
 void printAdjMatrix(AdjacencyMatrix adjMatrix)
@@ -29,15 +36,25 @@ void printAdjMatrix(AdjacencyMatrix adjMatrix)
     }
 }
 
-//Serial implementation
-void serialClusteringCoefficient(AdjacencyMatrix adjMatrix)
+//Parallel implementation
+void *parallelClusteringCoefficient(void *thread_id)
 {
+	
+	int size = n;
+	int t = thread_count;
+	long id = (long)thread_id;
+	long start = id * (n/t);
+	long end = 0;
+	if((int) id == (int) t - 1) end = n - 1;
+	else end = start + (n/t) - 1;
+	
     int degree;
     std::vector< int > neighbors;
-    float coefficientsSum = 0.f;
     float maxEdges, edgeCount, coefficient, result;
 
-    for (int i=0; i<adjMatrix.size(); i++)
+	cout << start << endl;
+	cout << end << endl;
+    for (int i=start; i<=end; i++)
     {
 	// Reset variables for each node
 	degree = 0;
@@ -71,29 +88,31 @@ void serialClusteringCoefficient(AdjacencyMatrix adjMatrix)
 	}
 	
 	// Calculate max number of edges
+	if(edgeCount > 1)
+	{
 	maxEdges = degree * (degree - 1);
 
 	// Calculate node i's clustering coefficient
 	coefficient = edgeCount/maxEdges;
 
 	// Add node i's coefficient to sum
-	coefficientsSum += coefficient;
+	mtx.lock();
+	globalCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC += coefficient;
+	mtx.unlock();
+	}
     }
-    
-    // Calculate graph's clustering coefficient and print result
-    result = coefficientsSum/adjMatrix.size();
-    cout << "Parallel Clustering Coefficient Result: " << result << endl;
 }
 	
 	int main(int argc, char** argv)
 {
-    if(argc<2){
-      cout<<"To run: ./assign2Graph filename"<<endl;
-      cout<<"./assign2Graph networkDatasets/toyGraph1.txt"<<endl;
+    if(argc<3){
+      cout<<"To run: ./assign2Graph filename t"<<endl;
+      cout<<"./assign2Graph networkDatasets/toyGraph1.txt 4"<<endl;
       return 0;
     }
 
     fstream myfile(argv[1],std::ios_base::in);
+	thread_count = atoi(argv[2]);
     int u,v;
     int maxNode = 0;
     vector<pair<int,int> > allEdges;
@@ -107,7 +126,7 @@ void serialClusteringCoefficient(AdjacencyMatrix adjMatrix)
           maxNode = v;
     }
 
-    int n = maxNode +1;  //Since nodes starts with 0
+    n = maxNode +1;  //Since nodes starts with 0
     cout<<"Graph has "<< n <<" nodes"<<endl;
 
     adjMatrix = AdjacencyMatrix(n,vector<int>(n));
@@ -118,11 +137,23 @@ void serialClusteringCoefficient(AdjacencyMatrix adjMatrix)
        adjMatrix[u][v] = 1;
        adjMatrix[v][u] = 1;
     }
-
-    serialClusteringCoefficient(adjMatrix);
+	
 
     if(n<=10)
       printAdjMatrix(adjMatrix);
+  
+  long       thread;
+   pthread_t* thread_handles; 
+   thread_handles = (pthread_t*) malloc (thread_count*sizeof(pthread_t));
+   for (thread = 0; thread < thread_count; thread++)  
+      pthread_create(&thread_handles[thread], NULL,
+          parallelClusteringCoefficient, (void*) thread);
+	
+	for (thread = 0; thread < thread_count; thread++) 
+		pthread_join(thread_handles[thread], NULL);
+	
+	float result = (float)globalCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC / adjMatrix.size();
+	cout << "Result: " << result << endl;
 
 	//You can also make a list of neighbors for each node if you want.
 
